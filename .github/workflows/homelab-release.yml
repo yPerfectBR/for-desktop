@@ -1,0 +1,170 @@
+name: Homelab Desktop Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (example: 1.0.0)"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    env:
+      PLATFORM: ci
+
+    steps:
+      - name: Checkout homelab branch
+        uses: actions/checkout@v4
+        with:
+          ref: homelab
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm fmt
+
+      - name: Build Windows installers
+        run: pnpm make -- --arch=x64
+
+      - name: Collect Windows release files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Get-ChildItem -Path out/make -Recurse -File | Where-Object {
+            $_.Extension -in '.exe', '.zip', '.nupkg'
+          } | ForEach-Object {
+            Copy-Item $_.FullName -Destination (Join-Path 'release-assets' $_.Name)
+          }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: release-assets/*
+          if-no-files-found: error
+
+  linux:
+    name: Build Linux x64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout homelab branch
+        uses: actions/checkout@v4
+        with:
+          ref: homelab
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libpipewire-0.3-dev
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm fmt
+
+      - name: Package Linux application
+        run: pnpm package
+
+      - name: Create portable Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          dir="$(find out -maxdepth 1 -mindepth 1 -type d -name '*-linux-x64' -print -quit)"
+          test -n "$dir"
+          test -x "$dir/stoat-homelab"
+          tar -C "$(dirname "$dir")" -czf release-assets/Stoat-Homelab-linux-x64.tar.gz "$(basename "$dir")"
+          sha256sum release-assets/Stoat-Homelab-linux-x64.tar.gz > release-assets/Stoat-Homelab-linux-x64.tar.gz.sha256
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: release-assets/*
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout homelab branch
+        uses: actions/checkout@v4
+        with:
+          ref: homelab
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="homelab-v${VERSION}"
+
+          args=(
+            "$tag"
+            --target homelab
+            --title "Stoat Homelab Desktop v${VERSION}"
+            --generate-notes
+          )
+
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "${args[@]}" release-assets/*
