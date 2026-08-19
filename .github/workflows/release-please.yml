@@ -85,13 +85,20 @@ jobs:
         env:
           PLATFORM: ${{ matrix.os }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Tar gz
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
+        run : |
+          cd ./out/Stoat-linux-${{ case(matrix.os == 'ubuntu-latest', 'x64', 'arm64') }}
+          tar -zcvf ../../Stoat.tar.gz .
+          cd ../..
 
       - name: Upload artifact for AppImage build
         if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
         uses: actions/upload-artifact@v6
         with:
           name: stoat-linux-package-${{ case(matrix.os == 'ubuntu-latest', 'x64', 'arm64') }}
-          path: ./out/make/zip/linux/${{ case(matrix.os == 'ubuntu-latest', 'x64', 'arm64') }}/Stoat-linux-*.zip
+          path: ./Stoat.tar.gz
   
   build-appimage:
     needs: [release-please, publish-release]
@@ -103,20 +110,25 @@ jobs:
     container: ghcr.io/pkgforge-dev/archlinux:latest
 
     steps:
+      - name: Preparing Container
+        uses: pkgforge-dev/anylinux-setup-action@0964f2258d6c93d1391359978dde081fd8b3c6af # v2
+
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Checkout assets
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git -c submodule."assets".update=checkout submodule update --init assets
+
+      - name: Install Dependencies
+        run: /bin/sh ./.github/build/appimage/get-dependencies.sh
 
       - name: Download Artifact
         uses: actions/download-artifact@v7
         with:
           name: stoat-linux-package-${{ case(matrix.os == 'ubuntu-latest', 'x64', 'arm64') }}
           path: /tmp/stoat
-
-      - name: Preparing Container
-        uses: pkgforge-dev/anylinux-setup-action@0964f2258d6c93d1391359978dde081fd8b3c6af # v2
-
-      - name: Install Dependencies
-        run: /bin/sh ./.github/build/appimage/get-dependencies.sh
 
       - name: Extract Artifact
         run: /bin/sh ./.github/build/appimage/extract-artifact.sh

@@ -1,7 +1,7 @@
 {
   "name": "stoat-homelab-desktop",
   "productName": "Stoat Homelab",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "main": ".vite/build/main.js",
   "repository": "yPerfectBR/for-desktop",
   "scripts": {
@@ -40,8 +40,7 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
-    "electron": "^43.4.0",
-    "electron-vite": "^5.0.0",
+    "electron": "43.4.0",
     "electron-windows-store": "^2.1.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
