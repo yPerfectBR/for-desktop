@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.3](https://github.com/stoatchat/for-desktop/compare/v1.5.2...v1.5.3) (2026-08-19)
+
+
+### Reverts
+
+* Add Mic and Webcam Entitlements ([#259](https://github.com/stoatchat/for-desktop/issues/259)) ([#283](https://github.com/stoatchat/for-desktop/issues/283)) ([644f076](https://github.com/stoatchat/for-desktop/commit/644f0765b4d2f83656ea0868f4898091ca9f6442))
+
 ## [1.5.2](https://github.com/stoatchat/for-desktop/compare/v1.5.1...v1.5.2) (2026-08-17)
 
 
