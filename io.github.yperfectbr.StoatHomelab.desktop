@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=Stoat
+Name=Stoat Homelab
 Comment=Open source, user-first chat platform
-Exec=stoat-desktop
+Exec=stoat-homelab
 Terminal=false
 Type=Application
-Icon=chat.stoat.StoatDesktop
+Icon=io.github.yperfectbr.StoatHomelab
 Categories=Network;InstantMessaging
-StartupWMClass=stoat-desktop
+StartupWMClass=stoat-homelab
 X-Desktop-File-Install-Version=0.26
-X-Flatpak=chat.stoat.StoatDesktop
+X-Flatpak=io.github.yperfectbr.StoatHomelab

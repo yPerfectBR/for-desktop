@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop">
-  <id>chat.stoat.StoatDesktop</id>
-  <launchable type="desktop-id">chat.stoat.StoatDesktop.desktop</launchable>
-  <name>Stoat</name>
+  <id>io.github.yperfectbr.StoatHomelab</id>
+  <launchable type="desktop-id">io.github.yperfectbr.StoatHomelab.desktop</launchable>
+  <name>Stoat Homelab</name>
   <developer id="chat.stoat">
     <name>Revolt Platforms Ltd</name>
   </developer>

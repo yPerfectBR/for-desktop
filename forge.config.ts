@@ -16,8 +16,8 @@ import path from "node:path";
 
 const STRINGS = {
   author: "Revolt Platforms LTD",
-  name: "Stoat",
-  execName: "stoat-desktop",
+  name: "StoatHomelab",
+  execName: "stoat-homelab",
   description: "Open source user-first chat platform.",
 };
 
@@ -42,7 +42,7 @@ const makers: ForgeConfig["makers"] = [
   new MakerZIP({}),
   new MakerFlatpak({
     options: {
-      id: "chat.stoat.StoatDesktop",
+      id: "io.github.yperfectbr.StoatHomelab",
       description: STRINGS.description,
       productName: STRINGS.name,
       productDescription: STRINGS.description,
@@ -92,7 +92,7 @@ const makers: ForgeConfig["makers"] = [
         "--talk-name=com.canonical.Unity",
         "--env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons",
         "--env=ELECTRON_TRASH=gio",
-        "--env=TMPDIR=xdg-run/app/chat.stoat.StoatDesktop",
+        "--env=TMPDIR=xdg-run/app/io.github.yperfectbr.StoatHomelab",
       ],
       files: [],
     } as MakerFlatpakOptionsConfig,
@@ -198,7 +198,7 @@ const config: ForgeConfig = {
   publishers: [
     new PublisherGithub({
       repository: {
-        owner: "stoatchat",
+        owner: "yPerfectBR",
         name: "for-desktop",
       },
     }),

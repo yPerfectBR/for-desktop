@@ -1,9 +1,9 @@
 {
-  "name": "stoat-desktop",
-  "productName": "stoat-desktop",
+  "name": "stoat-homelab-desktop",
+  "productName": "Stoat Homelab",
   "version": "1.5.2",
   "main": ".vite/build/main.js",
-  "repository": "stoatchat/desktop",
+  "repository": "yPerfectBR/for-desktop",
   "scripts": {
     "start": "electron-forge start -- --no-sandbox",
     "package": "electron-forge package",
@@ -13,8 +13,8 @@
     "lint:fix": "eslint --ext --fix .ts,.tsx .",
     "fmt": "prettier --check 'src/**/*.{ts,tsx,json}'",
     "fmt:fix": "prettier --write 'src/**/*.{ts,tsx,json}'",
-    "install:flatpak": "flatpak --user install out/make/flatpak/x86_64/chat.stoat.StoatDesktop_stable_x86_64.flatpak",
-    "run:flatpak": "flatpak run --socket=session-bus chat.stoat.StoatDesktop",
+    "install:flatpak": "flatpak --user install out/make/flatpak/x86_64/io.github.yperfectbr.StoatHomelab_stable_x86_64.flatpak",
+    "run:flatpak": "flatpak run --socket=session-bus io.github.yperfectbr.StoatHomelab",
     "run:nix": "/usr/bin/env electron-nix ."
   },
   "keywords": [],
