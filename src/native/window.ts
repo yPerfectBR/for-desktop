@@ -88,10 +88,30 @@ export function createMainWindow() {
     mainWindow.maximize();
   }
 
-  // load the entrypoint
-  mainWindow
-    .loadURL(BUILD_URL.toString())
-    .then(() => mainWindow.webContents.reload());
+  // The web frontend is hosted independently from the desktop shell and can
+  // be updated without a new desktop release. Clear transient Chromium data
+  // before navigation so an old Service Worker or cached bundle cannot pin
+  // the client to an outdated frontend.
+  async function loadEntrypoint() {
+    const webSession = mainWindow.webContents.session;
+
+    try {
+      await webSession.clearStorageData({
+        origin: BUILD_URL.origin,
+        storages: ["serviceworkers", "cachestorage"],
+      });
+
+      await webSession.clearCache();
+      await webSession.clearCodeCaches({});
+    } catch (error) {
+      console.warn("Failed to clear Stoat web caches", error);
+    }
+
+    await mainWindow.loadURL(BUILD_URL.toString());
+    mainWindow.webContents.reload();
+  }
+
+  void loadEntrypoint();
 
   // minimise window to tray
   mainWindow.on("close", (event) => {
