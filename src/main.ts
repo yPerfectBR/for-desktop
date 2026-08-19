@@ -36,7 +36,8 @@ const onNotifyUser = (_info: IUpdateInfo) => {
 
 if (acquiredLock) {
   // start auto update logic
-  updateElectronApp({ onNotifyUser });
+  // Only use the official updater when targeting the official Stoat host.
+  if (BUILD_URL.hostname === "stoat.chat") updateElectronApp({ onNotifyUser });
 
   // create and configure the app when electron is ready
   app.on("ready", () => {

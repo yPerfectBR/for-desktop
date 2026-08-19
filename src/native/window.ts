@@ -23,7 +23,7 @@ export let mainWindow: BrowserWindow;
 export const BUILD_URL = new URL(
   app.commandLine.hasSwitch("force-server")
     ? app.commandLine.getSwitchValue("force-server")
-    : /*MAIN_WINDOW_VITE_DEV_SERVER_URL ??*/ "https://stoat.chat/app",
+    : /*MAIN_WINDOW_VITE_DEV_SERVER_URL ??*/ "https://homelab.tail9c15a4.ts.net:8888",
 );
 
 // internal window state
