@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout homelab branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: homelab
 
@@ -34,12 +34,12 @@ jobs:
         run: git -c submodule."assets".update=checkout submodule update --init assets
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 26
           cache: pnpm
@@ -93,7 +93,7 @@ jobs:
             Format-Table Name, Length
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: windows-x64
           path: release-assets/*
@@ -105,7 +105,7 @@ jobs:
 
     steps:
       - name: Checkout homelab branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: homelab
 
@@ -114,12 +114,12 @@ jobs:
         run: git -c submodule."assets".update=checkout submodule update --init assets
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 26
           cache: pnpm
@@ -159,7 +159,7 @@ jobs:
           sha256sum release-assets/Stoat-Homelab-linux-x64.tar.gz > release-assets/Stoat-Homelab-linux-x64.tar.gz.sha256
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: linux-x64
           path: release-assets/*
@@ -172,12 +172,12 @@ jobs:
 
     steps:
       - name: Checkout homelab branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: homelab
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: release-assets
           merge-multiple: true
