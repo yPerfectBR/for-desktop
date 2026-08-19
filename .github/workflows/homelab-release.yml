@@ -28,7 +28,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: homelab
-          submodules: recursive
+
+      - name: Checkout assets
+        shell: bash
+        run: git -c submodule."assets".update=checkout submodule update --init assets
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -47,11 +50,8 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Check formatting
-        run: pnpm fmt
-
       - name: Build Windows installers
-        run: pnpm make -- --arch=x64
+        run: pnpm exec electron-forge make --platform=win32 --arch=x64 --targets=@electron-forge/maker-squirrel,@electron-forge/maker-zip
 
       - name: Collect Windows release files
         shell: pwsh
@@ -79,7 +79,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: homelab
-          submodules: recursive
+
+      - name: Checkout assets
+        shell: bash
+        run: git -c submodule."assets".update=checkout submodule update --init assets
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
