@@ -51,17 +51,40 @@ jobs:
         run: pnpm lint
 
       - name: Build Windows installers
-        run: pnpm exec electron-forge make --platform=win32 --arch=x64 --targets=@electron-forge/maker-squirrel,@electron-forge/maker-zip
+        run: pnpm exec electron-forge make --platform=win32 --arch=x64 --targets=@electron-forge/maker-squirrel
 
       - name: Collect Windows release files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          Get-ChildItem -Path out/make -Recurse -File | Where-Object {
-            $_.Extension -in '.exe', '.zip', '.nupkg'
-          } | ForEach-Object {
-            Copy-Item $_.FullName -Destination (Join-Path 'release-assets' $_.Name)
+
+          $packageDir = Get-ChildItem -Path out -Directory |
+            Where-Object { $_.Name -like "*-win32-x64" } |
+            Select-Object -First 1
+
+          if (-not $packageDir) {
+            throw "Windows x64 package directory not found in out/"
           }
+
+          $portableZip = Join-Path (Resolve-Path release-assets) "Stoat-Homelab-win32-x64.zip"
+
+          Compress-Archive `
+            -Path (Join-Path $packageDir.FullName "*") `
+            -DestinationPath $portableZip `
+            -Force
+
+          Get-ChildItem -Path out/make -Recurse -File |
+            Where-Object {
+              $_.Extension -in ".exe", ".nupkg" -or
+              $_.Name -eq "RELEASES"
+            } |
+            ForEach-Object {
+              Copy-Item $_.FullName -Destination (Join-Path "release-assets" $_.Name)
+            }
+
+          Write-Host "===== Windows release assets ====="
+          Get-ChildItem release-assets |
+            Format-Table Name, Length
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
