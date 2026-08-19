@@ -16,6 +16,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: homelab-desktop-release-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   windows:
     name: Build Windows x64
