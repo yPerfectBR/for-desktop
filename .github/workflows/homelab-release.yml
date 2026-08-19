@@ -47,6 +47,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set release version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
+
       - name: Lint
         run: pnpm lint
 
@@ -125,6 +131,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Set release version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
 
       - name: Lint
         run: pnpm lint
