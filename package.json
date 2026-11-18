@@ -5,7 +5,9 @@
   "main": ".vite/build/main.js",
   "repository": "yPerfectBR/for-desktop",
   "scripts": {
-    "start": "electron-forge start -- --no-sandbox",
+    "start": "ELECTRON_OZONE_PLATFORM_HINT=auto electron-forge start -- --no-sandbox",
+    "start:prime": "ELECTRON_OZONE_PLATFORM_HINT=auto prime-run electron-forge start -- --no-sandbox",
+    "run:prime": "ELECTRON_OZONE_PLATFORM_HINT=auto prime-run /home/perfect/for-desktop/out/StoatHomelab-linux-x64/stoat-homelab",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",

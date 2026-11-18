@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "fs";
+import { join } from "path";
 import { IUpdateInfo, updateElectronApp } from "update-electron-app";
 
 import { BrowserWindow, Notification, app, shell } from "electron";
@@ -16,8 +18,111 @@ if (started) {
   app.quit();
 }
 
-// disable hw-accel if so requested
-if (!config.hardwareAcceleration) {
+// Linux screen share (Wayland + PipeWire / xdg-desktop-portal):
+// Without WebRTCPipeWireCapturer, desktopCapturer only sees this process.
+// Must run before app ready. Prefer native Wayland so capture is not XWayland.
+if (process.platform === "linux") {
+  app.commandLine.appendSwitch(
+    "enable-features",
+    [
+      "WebRTCPipeWireCapturer",
+      // Keep encode path healthy on Linux; avoids muddy/low-bitrate shares.
+      "VaapiVideoEncoder",
+      "VaapiVideoDecoder",
+    ].join(","),
+  );
+  // Electron/Chromium Wayland + Vulkan is incompatible and can break capture.
+  app.commandLine.appendSwitch("disable-features", "Vulkan");
+  app.commandLine.appendSwitch("enable-usermedia-screen-capturing");
+
+  const nvidiaOffload =
+    process.env.__NV_PRIME_RENDER_OFFLOAD === "1" ||
+    process.env.__GLX_VENDOR_LIBRARY_NAME === "nvidia";
+
+  const onWayland =
+    process.env.XDG_SESSION_TYPE === "wayland" || !!process.env.WAYLAND_DISPLAY;
+  // Check argv, not app.commandLine: Electron injects --ozone-platform itself.
+  const userPickedOzone = process.argv.some((a) =>
+    a.startsWith("--ozone-platform"),
+  );
+
+  // Under PRIME offload, native Wayland renders on the NVIDIA GPU but the
+  // compositor (on the iGPU) never presents those buffers: transparent,
+  // empty window. XWayland handles the cross-GPU copy, so use X11 there.
+  // The ozone platform is fixed before main.js runs (appendSwitch is too
+  // late), so relaunch once with the switch on the real command line.
+  if (onWayland && nvidiaOffload && !userPickedOzone) {
+    app.relaunch({
+      args: [...process.argv.slice(1), "--ozone-platform=x11"],
+    });
+    app.exit(0);
+  } else if (onWayland && !userPickedOzone) {
+    app.commandLine.appendSwitch("ozone-platform-hint", "auto");
+  }
+
+  // Hybrid Intel+NVIDIA: pin the GPU process to the render node that matches
+  // the GL driver actually in use. On Wayland, Chromium otherwise defaults to
+  // the compositor's node (the iGPU here).
+  //  - Normal launch: compositor's primary device (WLR/AQ_DRM_DEVICES), so
+  //    PipeWire DMA-BUFs from iGPU outputs import correctly.
+  //  - NVIDIA PRIME offload (prime-run): EGL is forced to the NVIDIA driver;
+  //    leaving the Intel node makes every SkSurface fail and the GPU process
+  //    crash-loops until Chromium aborts (blank window). Use the NVIDIA node.
+  if (!app.commandLine.hasSwitch("render-node-override")) {
+    const renderNodeOf = (card: string) =>
+      readdirSync(join("/sys/class/drm", card, "device", "drm")).find((n) =>
+        n.startsWith("renderD"),
+      );
+
+    try {
+      let card: string | undefined;
+      if (nvidiaOffload) {
+        card = readdirSync("/sys/class/drm")
+          .filter((n) => /^card\d+$/.test(n))
+          .find((n) => {
+            try {
+              return (
+                readFileSync(
+                  join("/sys/class/drm", n, "device", "vendor"),
+                  "utf8",
+                ).trim() === "0x10de"
+              );
+            } catch {
+              return false;
+            }
+          });
+      } else {
+        card = (process.env.WLR_DRM_DEVICES || process.env.AQ_DRM_DEVICES || "")
+          .split(":")
+          .map((p) => p.trim())
+          .find((p) => p.length > 0)
+          ?.split("/")
+          .pop(); // /dev/dri/card1 -> card1
+      }
+
+      const render = card && renderNodeOf(card);
+      if (render) {
+        app.commandLine.appendSwitch(
+          "render-node-override",
+          `/dev/dri/${render}`,
+        );
+      }
+    } catch {
+      // Best-effort; sysfs/compositor env may be unavailable.
+    }
+  }
+}
+
+// Prefer GPU rendering; still honour the config toggle that disables it.
+if (config.hardwareAcceleration) {
+  app.commandLine.appendSwitch("ignore-gpu-blocklist");
+  app.commandLine.appendSwitch("enable-gpu-rasterization");
+  // NOTE: do NOT enable-zero-copy on Linux hybrid GPUs — DMA-BUF zero-copy
+  // across Intel/NVIDIA is a common cause of solid-black screen shares.
+  if (process.platform !== "linux") {
+    app.commandLine.appendSwitch("enable-zero-copy");
+  }
+} else {
   app.disableHardwareAcceleration();
 }
 

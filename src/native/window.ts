@@ -214,38 +214,76 @@ export function createMainWindow() {
     }
   });
 
-  // Create display media request handler
+  // Screen share / display media
+  //
+  // Linux Wayland + PipeWire: desktopCapturer.getSources() opens the
+  // xdg-desktop-portal picker and resolves with exactly one source (whatever
+  // the user picked). Calling getSources without WebRTCPipeWireCapturer only
+  // enumerates this app — which is why Stoat alone used to appear.
+  //
+  // X11 / Windows / macOS: keep the in-app picker with thumbnails.
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
+      const isWayland =
+        process.platform === "linux" &&
+        (process.env.XDG_SESSION_TYPE === "wayland" ||
+          !!process.env.WAYLAND_DISPLAY);
+
+      const grant = (source: Electron.DesktopCapturerSource) => {
+        if (request.audioRequested) {
+          callback({ video: source, audio: "loopback" });
+        } else {
+          callback({ video: source });
+        }
+      };
+
+      // High thumbnail size keeps portal/in-app previews sharp; PipeWire still
+      // delivers the full selected output (incl. non-NVIDIA DRM heads).
+      const capturerOpts: Electron.SourcesOptions = {
+        types: ["screen", "window"],
+        thumbnailSize: { width: 1920, height: 1080 },
+      };
+
+      if (isWayland) {
+        desktopCapturer
+          .getSources(capturerOpts)
+          .then((sources) => {
+            if (!sources.length) {
+              callback({});
+              return;
+            }
+            grant(sources[0]);
+          })
+          .catch((err) => {
+            console.error("Wayland screen share: portal selection failed", err);
+            // Electron requires a video object even on cancel for the promise to settle.
+            callback({ video: { id: "", name: "" } });
+          });
+        return;
+      }
+
       desktopCapturer
-        .getSources({ types: ["screen", "window"], fetchWindowIcons: true })
+        .getSources({ ...capturerOpts, fetchWindowIcons: true })
         .then((sources) => {
-          // Shortcut for linux wayland.
-          if (sources.length == 1) {
-            request.audioRequested
-              ? callback({
-                  video: sources[0],
-                  audio: "loopback",
-                })
-              : callback({
-                  video: sources[0],
-                });
+          if (sources.length === 1) {
+            grant(sources[0]);
             return;
           }
+
           ipcMain.once(
             "screenPickerCallback",
             (_, idx: number, audio: boolean) => {
-              if (idx < 0 || idx > sources.length) {
+              if (idx < 0 || idx >= sources.length) {
                 callback({});
+              } else if (audio) {
+                callback({
+                  video: sources[idx],
+                  audio: "loopback",
+                });
               } else {
-                audio
-                  ? callback({
-                      video: sources[idx],
-                      audio: "loopback",
-                    })
-                  : callback({
-                      video: sources[idx],
-                    });
+                callback({
+                  video: sources[idx],
+                });
               }
             },
           );
@@ -268,8 +306,14 @@ export function createMainWindow() {
               };
             }),
           );
+        })
+        .catch((err) => {
+          console.error("Screen share: failed to list sources", err);
+          callback({});
         });
     },
+    // Experimental: native picker on macOS 15+. Harmless elsewhere; Wayland
+    // still uses the PipeWire/portal path above when the system picker is N/A.
     { useSystemPicker: true },
   );
 

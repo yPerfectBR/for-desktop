@@ -1,7 +1,8 @@
 [Desktop Entry]
 Name=Stoat Homelab
 Comment=Open source, user-first chat platform
-Exec=stoat-homelab
+# Ozone auto: native Wayland + PipeWire portal for screen share; GPU via DRI
+Exec=env ELECTRON_OZONE_PLATFORM_HINT=auto stoat-homelab
 Terminal=false
 Type=Application
 Icon=io.github.yperfectbr.StoatHomelab

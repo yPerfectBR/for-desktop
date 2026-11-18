@@ -1,0 +1,61 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Stoat screenshare probe</title>
+<style>
+  body { font: 14px sans-serif; background: #111; color: #eee; margin: 24px; }
+  video { width: 100%; max-height: 70vh; background: #000; border: 1px solid #333; }
+  button { font-size: 16px; padding: 10px 16px; margin: 8px 8px 8px 0; }
+  #log { white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+</style>
+<h1>Screenshare probe</h1>
+<p>Escolha <b>tela inteira</b> (incluindo monitores fora da NVIDIA).</p>
+<button id="go">Compartilhar tela</button>
+<button id="sample">Amostrar pixels do vídeo</button>
+<video id="v" autoplay playsinline muted></video>
+<div id="log"></div>
+<script>
+const log = (...a) => {
+  document.getElementById("log").textContent += a.join(" ") + "\n";
+  console.log(...a);
+};
+log("mediaDevices", !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia));
+document.getElementById("go").onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: {
+        frameRate: { ideal: 60, max: 60 },
+        width: { ideal: 2560 },
+        height: { ideal: 1600 },
+      },
+      audio: false,
+    });
+    const v = document.getElementById("v");
+    v.srcObject = stream;
+    const track = stream.getVideoTracks()[0];
+    log("track", track.label, JSON.stringify(track.getSettings()));
+  } catch (e) {
+    log("error", e.message || e);
+  }
+};
+document.getElementById("sample").onclick = () => {
+  const v = document.getElementById("v");
+  if (!v.videoWidth) {
+    log("no video yet");
+    return;
+  }
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth;
+  c.height = v.videoHeight;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(v, 0, 0);
+  const { data } = ctx.getImageData(0, 0, c.width, c.height);
+  let sum = 0,
+    n = 0;
+  for (let i = 0; i < data.length; i += 64) {
+    sum += data[i] + data[i + 1] + data[i + 2];
+    n += 3;
+  }
+  const avg = sum / n;
+  log("frame", c.width + "x" + c.height, "avgChannel=" + avg.toFixed(2), "black=" + (avg < 3));
+};
+</script>

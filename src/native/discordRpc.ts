@@ -31,7 +31,10 @@ export async function initDiscordRpc() {
 
     rpc.on("disconnected", reconnect);
 
-    rpc.login({ clientId: "872068124005007420" });
+    rpc
+      .login({ clientId: "872068124005007420" })
+      // Discord not running → "Could not connect"; retry later quietly.
+      .catch(reconnect);
   } catch (err) {
     reconnect();
   }
