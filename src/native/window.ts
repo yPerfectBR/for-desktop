@@ -15,6 +15,7 @@ import windowIconAsset from "../../assets/desktop/icon.png?asset";
 
 import { config } from "./config";
 import { updateTrayMenu } from "./tray";
+import { startVirtualMic } from "./virtualMic";
 
 // global reference to main window
 export let mainWindow: BrowserWindow;
@@ -223,7 +224,17 @@ export function createMainWindow() {
   //
   // X11 / Windows / macOS: keep the in-app picker with thumbnails.
   session.defaultSession.setDisplayMediaRequestHandler(
-    (request, callback) => {
+    (request, originalCallback) => {
+      // Start the virtual mic (upstream) before handing streams back.
+      const callback = async (streams: Electron.Streams) => {
+        try {
+          if (streams.video) await startVirtualMic();
+        } catch (e) {
+          console.error("Virtual mic setup error", e);
+        } finally {
+          originalCallback(streams);
+        }
+      };
       const isWayland =
         process.platform === "linux" &&
         (process.env.XDG_SESSION_TYPE === "wayland" ||
@@ -256,8 +267,8 @@ export function createMainWindow() {
           })
           .catch((err) => {
             console.error("Wayland screen share: portal selection failed", err);
-            // Electron requires a video object even on cancel for the promise to settle.
-            callback({ video: { id: "", name: "" } });
+            // Portal cancelled: settle without starting the virtual mic.
+            originalCallback(null);
           });
         return;
       }
@@ -309,7 +320,7 @@ export function createMainWindow() {
         })
         .catch((err) => {
           console.error("Screen share: failed to list sources", err);
-          callback({});
+          originalCallback(null);
         });
     },
     // Experimental: native picker on macOS 15+. Harmless elsewhere; Wayland
@@ -317,18 +328,21 @@ export function createMainWindow() {
     { useSystemPicker: true },
   );
 
-  // push world events to the window
-  ipcMain.on("minimise", () => mainWindow.minimize());
-  ipcMain.on("maximise", () =>
-    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize(),
-  );
-  ipcMain.on("close", () => mainWindow.close());
-
   // mainWindow.webContents.openDevTools();
 
   // let i = 0;
   // setInterval(() => setBadgeCount((++i % 30) + 1), 1000);
 }
+
+// Push world events to the window
+//
+// The window can in theory be recreated, and this is done in practice on macOS,
+// so this is registered app-wide
+ipcMain.on("minimise", () => mainWindow?.minimize());
+ipcMain.on("maximise", () =>
+  mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize(),
+);
+ipcMain.on("close", () => mainWindow?.close());
 
 /**
  * Quit the entire app

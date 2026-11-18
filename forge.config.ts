@@ -1,5 +1,3 @@
-import { MakerAppX } from "@electron-forge/maker-appx";
-import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerFlatpak } from "@electron-forge/maker-flatpak";
 import { MakerFlatpakOptionsConfig } from "@electron-forge/maker-flatpak/dist/Config";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
@@ -56,6 +54,8 @@ const makers: ForgeConfig["makers"] = [
         "512x512": `${ASSET_DIR}/hicolor/512x512.png`,
       } as unknown,
       categories: ["Network"],
+      // open stoat:// links
+      mimeType: ["x-scheme-handler/stoat"],
       modules: [
         // use the latest zypak -- Electron sandboxing for Flatpak
         {
@@ -94,40 +94,19 @@ const makers: ForgeConfig["makers"] = [
         "--env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons",
         "--env=ELECTRON_TRASH=gio",
         "--env=ELECTRON_OZONE_PLATFORM_HINT=auto",
-        "--env=TMPDIR=xdg-run/app/io.github.yperfectbr.StoatHomelab",
       ],
       files: [],
     } as MakerFlatpakOptionsConfig,
   }),
 ];
 
-// skip these makers in CI/CD
-if (!process.env.PLATFORM) {
-  makers.push(
-    // must be manually built (freezes CI process)
-    // not much use in being published anyhow
-    new MakerAppX({
-      certPass: "",
-      packageExecutable: `app\\${STRINGS.execName}.exe`,
-      publisher: "CN=B040CC7E-0016-4AF5-957F-F8977A6CFA3B",
-    }),
-    // testing purposes
-    new MakerDeb({
-      options: {
-        productName: STRINGS.name,
-        productDescription: STRINGS.description,
-        categories: ["Network"],
-        icon: `${ASSET_DIR}/icon.png`,
-      },
-    }),
-  );
-}
-
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     name: STRINGS.name,
     executableName: STRINGS.execName,
+    // open stoat:// links (on mac)
+    protocols: [{ name: STRINGS.name, schemes: ["stoat"] }],
     icon:
       process.platform === "darwin"
         ? `${ASSET_DIR}/icon.icon`
