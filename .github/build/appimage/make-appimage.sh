@@ -8,6 +8,8 @@ export OUTPATH=./dist
 export ADD_HOOKS="self-updater.hook"
 export UPINFO="gh-releases-zsync|${GITHUB_REPOSITORY%/*}|${GITHUB_REPOSITORY#*/}|latest|*$ARCH.AppImage.zsync"
 export DEPLOY_PIPEWIRE=1
+# the .desktop Exec starts with `env ...`; tell sharun which binary is the app
+export MAIN_BIN=stoat-homelab
 
 cp -v ./assets/desktop/icon.svg ./AppDir/.DirIcon
 cp -v ./assets/desktop/icon.svg ./AppDir/

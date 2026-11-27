@@ -33,8 +33,15 @@ export default defineConfig([
         "error",
         {
           // vite asset imports; ESM-only packages the require-based node
-          // resolver cannot resolve (only imported from eslint.config.mjs)
-          ignore: ["^.*\\?asset$", "^typescript-eslint$", "^eslint/config$"],
+          // resolver cannot resolve (only imported from eslint.config.mjs);
+          // optional platform-specific deps
+          ignore: [
+            "^.*\\?asset$",
+            "^typescript-eslint$",
+            "^eslint/config$",
+            // Linux-only optional dependency, absent on Windows/macOS CI
+            "^node-pipewire$",
+          ],
         },
       ],
       "@typescript-eslint/no-unused-vars": [
