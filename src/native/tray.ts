@@ -4,6 +4,7 @@ import trayIconAsset from "../../assets/desktop/icon.png?asset";
 import macOsTrayIconAsset from "../../assets/desktop/iconTemplate.png?asset";
 import { version } from "../../package.json";
 
+import { updaterMenuItems } from "./updater";
 import { mainWindow, quitApp } from "./window";
 
 // internal tray state
@@ -25,7 +26,7 @@ export function initTray() {
   const trayIcon = createTrayIcon();
   tray = new Tray(trayIcon);
   updateTrayMenu();
-  tray.setToolTip("Stoat for Desktop");
+  tray.setToolTip("Stoat Homelab");
   tray.setImage(trayIcon);
   tray.on("click", () => {
     if (mainWindow.isVisible()) {
@@ -38,20 +39,11 @@ export function initTray() {
 }
 
 export function updateTrayMenu() {
-  tray!.setContextMenu(
+  if (!tray) return;
+  tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Stoat for Desktop", type: "normal", enabled: false },
-      {
-        label: "Version",
-        type: "submenu",
-        submenu: Menu.buildFromTemplate([
-          {
-            label: version,
-            type: "normal",
-            enabled: false,
-          },
-        ]),
-      },
+      { label: `Stoat Homelab v${version}`, type: "normal", enabled: false },
+      ...updaterMenuItems(),
       { type: "separator" },
       {
         label: mainWindow.isVisible() ? "Hide App" : "Show App",

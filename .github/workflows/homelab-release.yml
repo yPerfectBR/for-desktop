@@ -1,5 +1,12 @@
 name: Homelab Desktop Release
 
+# Builds every distributable and publishes them as one GitHub release.
+# The desktop app's self-updater (src/native/updater.ts) reads
+# /releases/latest and picks the asset matching its install type, so keep the
+# asset names/extensions stable:
+#   Windows: *Setup.exe, RELEASES, *.nupkg (Squirrel), *-win32-x64.zip
+#   Linux:   *.AppImage, *.deb, *.rpm, *.pkg.tar.zst, *.flatpak, *-linux-x64.tar.gz
+
 on:
   workflow_dispatch:
     inputs:
@@ -22,7 +29,7 @@ concurrency:
 
 jobs:
   windows:
-    name: Build Windows x64
+    name: Windows x64 (Squirrel + zip)
     runs-on: windows-latest
     env:
       PLATFORM: ci
@@ -60,6 +67,11 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # NOTE: the module path builds Squirrel with forge's default config, so
+      # the Squirrel app id stays "stoat_homelab_desktop" as in every release
+      # so far; changing it would make Windows installs side-by-side instead
+      # of updating in place. (Linux jobs use short names, which pick up the
+      # configured makers from forge.config.ts.)
       - name: Build Windows installers
         run: pnpm exec electron-forge make --platform=win32 --arch=x64 --targets=@electron-forge/maker-squirrel
 
@@ -92,6 +104,10 @@ jobs:
               Copy-Item $_.FullName -Destination (Join-Path "release-assets" $_.Name)
             }
 
+          if (-not (Test-Path release-assets/RELEASES)) {
+            throw "Squirrel RELEASES file missing; Windows auto-update would break"
+          }
+
           Write-Host "===== Windows release assets ====="
           Get-ChildItem release-assets |
             Format-Table Name, Length
@@ -104,8 +120,8 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Build Linux x64
-    runs-on: ubuntu-latest
+    name: Linux x64 (tar.gz + deb + rpm)
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout homelab branch
@@ -131,7 +147,8 @@ jobs:
       - name: Install native build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libpipewire-0.3-dev
+          sudo apt-get install -y build-essential pkg-config libpipewire-0.3-dev \
+            fakeroot dpkg-dev rpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -151,16 +168,22 @@ jobs:
       - name: Package Linux application
         run: pnpm package
 
-      - name: Create portable Linux archive
+      - name: Build .deb and .rpm
+        run: pnpm exec electron-forge make --skip-package --targets=deb,rpm
+
+      - name: Collect Linux release files
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release-assets
+          mkdir -p release-assets package
           dir="$(find out -maxdepth 1 -mindepth 1 -type d -name '*-linux-x64' -print -quit)"
           test -n "$dir"
           test -x "$dir/stoat-homelab"
           tar -C "$(dirname "$dir")" -czf release-assets/Stoat-Homelab-linux-x64.tar.gz "$(basename "$dir")"
-          sha256sum release-assets/Stoat-Homelab-linux-x64.tar.gz > release-assets/Stoat-Homelab-linux-x64.tar.gz.sha256
+          cp release-assets/Stoat-Homelab-linux-x64.tar.gz package/
+          find out/make -type f \( -name '*.deb' -o -name '*.rpm' \) -exec cp {} release-assets/ \;
+          ls release-assets/*.deb release-assets/*.rpm
+          ls -la release-assets
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v6
@@ -169,9 +192,187 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
 
+      # Plain tarball for the Arch / AppImage jobs (not published twice)
+      - name: Upload Linux package for repackaging
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-package
+          path: package/Stoat-Homelab-linux-x64.tar.gz
+          if-no-files-found: error
+
+  arch:
+    name: Arch Linux package
+    needs: linux
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+
+    steps:
+      - name: Install build tools
+        run: pacman -Syu --noconfirm --needed base-devel git
+
+      - name: Checkout homelab branch
+        uses: actions/checkout@v6
+        with:
+          ref: homelab
+
+      - name: Checkout assets
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git -c submodule."assets".update=checkout submodule update --init assets
+
+      - name: Download Linux package
+        uses: actions/download-artifact@v6
+        with:
+          name: linux-package
+          path: build
+
+      - name: Build package
+        env:
+          STOAT_VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          cp .github/build/arch/PKGBUILD .github/build/arch/stoat-homelab.desktop build/
+          cp -r assets/desktop/hicolor build/icons
+          useradd -m builder
+          chown -R builder build
+          su builder -c "cd build && STOAT_VERSION='$STOAT_VERSION' makepkg --nodeps -f"
+          mkdir -p release-assets
+          cp build/*.pkg.tar.zst release-assets/
+          ls -la release-assets
+
+      - name: Upload Arch artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-arch
+          path: release-assets/*
+          if-no-files-found: error
+
+  appimage:
+    name: AppImage
+    needs: linux
+    runs-on: ubuntu-latest
+    container: ghcr.io/pkgforge-dev/archlinux:v2026.05.15
+
+    steps:
+      - name: Preparing Container
+        uses: pkgforge-dev/anylinux-setup-action@0964f2258d6c93d1391359978dde081fd8b3c6af # v2
+
+      - name: Checkout homelab branch
+        uses: actions/checkout@v6
+        with:
+          ref: homelab
+
+      - name: Checkout assets
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git -c submodule."assets".update=checkout submodule update --init assets
+
+      - name: Install Dependencies
+        run: /bin/sh ./.github/build/appimage/get-dependencies.sh
+
+      - name: Download Linux package
+        uses: actions/download-artifact@v6
+        with:
+          name: linux-package
+          path: /tmp/stoat
+
+      - name: Extract Artifact
+        run: |
+          set -eu
+          mkdir -p ./AppDir/bin
+          tar -xzf /tmp/stoat/Stoat-Homelab-linux-x64.tar.gz -C /tmp/stoat
+          cp -a /tmp/stoat/StoatHomelab-linux-x64/. ./AppDir/bin/
+          echo "${{ inputs.version }}" > ~/version
+
+      - name: Make & Test AppImage
+        run: /bin/sh ./.github/build/appimage/make-appimage.sh
+
+      - name: Rename AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          img="$(find dist -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$img"
+          cp "$img" "release-assets/Stoat-Homelab-${{ inputs.version }}-x86_64.AppImage"
+          ls -la release-assets
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-appimage
+          path: release-assets/*
+          if-no-files-found: error
+
+  flatpak:
+    name: Flatpak bundle
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout homelab branch
+        uses: actions/checkout@v6
+        with:
+          ref: homelab
+
+      - name: Checkout assets
+        shell: bash
+        run: git -c submodule."assets".update=checkout submodule update --init assets
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install Flatpak tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder elfutils build-essential \
+            pkg-config libpipewire-0.3-dev
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk//25.08 \
+            org.electronjs.Electron2.BaseApp//25.08
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set release version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
+
+      - name: Build Flatpak
+        run: pnpm exec electron-forge make --targets=flatpak
+
+      - name: Collect Flatpak bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          find out/make -type f -name '*.flatpak' -exec cp {} release-assets/ \;
+          ls -la release-assets/*.flatpak
+
+      - name: Upload Flatpak artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-flatpak
+          path: release-assets/*
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
-    needs: [windows, linux]
+    needs: [windows, linux, arch, appimage, flatpak]
+    # Windows + core Linux packages are required; the repackaged formats are
+    # published when they succeed, so one flaky format can't block a release.
+    if: ${{ !cancelled() && needs.windows.result == 'success' && needs.linux.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -184,7 +385,15 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           path: release-assets
+          pattern: "{windows-x64,linux-x64,linux-arch,linux-appimage,linux-flatpak}"
           merge-multiple: true
+
+      - name: Checksums
+        shell: bash
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Publish release
         env:
@@ -196,10 +405,28 @@ jobs:
           set -euo pipefail
           tag="homelab-v${VERSION}"
 
+          cat > notes.md <<'EOF'
+          ## Downloads
+
+          | Sistema | Arquivo |
+          | --- | --- |
+          | Windows | `StoatHomelab-<versão>.Setup.exe` (instalador, atualiza sozinho) ou `Stoat-Homelab-win32-x64.zip` (portátil) |
+          | Ubuntu / Debian / Mint / Pop!_OS | `.deb` |
+          | Fedora / openSUSE | `.rpm` |
+          | Arch / CachyOS / Manjaro / EndeavourOS | `.pkg.tar.zst` (`sudo pacman -U arquivo`) |
+          | Qualquer distro | `.AppImage`, `.flatpak` ou `Stoat-Homelab-linux-x64.tar.gz` |
+
+          O app procura novas versões sozinho e oferece um botão **Atualizar agora**
+          (também no ícone da bandeja). Precisa estar na VPN do homelab para conectar.
+
+          EOF
+          sed -i 's/^          //' notes.md
+
           args=(
             "$tag"
             --target homelab
             --title "Stoat Homelab Desktop v${VERSION}"
+            --notes-file notes.md
             --generate-notes
           )
 

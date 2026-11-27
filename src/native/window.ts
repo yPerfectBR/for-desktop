@@ -5,6 +5,7 @@ import {
   Menu,
   MenuItem,
   app,
+  autoUpdater,
   desktopCapturer,
   ipcMain,
   nativeImage,
@@ -14,6 +15,11 @@ import {
 import windowIconAsset from "../../assets/desktop/icon.png?asset";
 
 import { config } from "./config";
+import {
+  clearOfflineState,
+  isServerReachable,
+  showOfflinePage,
+} from "./offline";
 import { updateTrayMenu } from "./tray";
 import { startVirtualMic } from "./virtualMic";
 
@@ -108,9 +114,44 @@ export function createMainWindow() {
       console.warn("Failed to clear Stoat web caches", error);
     }
 
-    await mainWindow.loadURL(BUILD_URL.toString());
-    mainWindow.webContents.reload();
+    // Off the homelab VPN the server is unreachable and Chromium would just
+    // leave an empty window; explain what to check instead.
+    if (!(await isServerReachable(BUILD_URL))) {
+      showOffline("O servidor não respondeu a tempo (timeout / sem rota).");
+      return;
+    }
+
+    try {
+      await mainWindow.loadURL(BUILD_URL.toString());
+      mainWindow.webContents.reload();
+    } catch {
+      // did-fail-load already switched to the offline page
+    }
   }
+
+  function showOffline(reason: string) {
+    showOfflinePage(mainWindow, BUILD_URL, reason, () => void loadEntrypoint());
+  }
+
+  // Main frame of the homelab frontend failed (VPN dropped before/while
+  // loading, DNS not resolving, TLS failure...).
+  mainWindow.webContents.on(
+    "did-fail-load",
+    (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      // -3 = ERR_ABORTED (navigation replaced, e.g. by reload)
+      if (!isMainFrame || errorCode === -3) return;
+      try {
+        if (new URL(validatedURL).origin !== BUILD_URL.origin) return;
+      } catch {
+        return;
+      }
+      showOffline(`${errorDescription} (${errorCode}) — ${validatedURL}`);
+    },
+  );
+
+  mainWindow.webContents.on("did-navigate", (_event, url) => {
+    if (url.startsWith(BUILD_URL.origin)) clearOfflineState();
+  });
 
   void loadEntrypoint();
 
@@ -354,5 +395,11 @@ export function quitApp() {
 
 // Ensure global app quit works properly
 app.on("before-quit", () => {
+  shouldQuit = true;
+});
+
+// Squirrel (Windows) closes every window before installing an update; don't
+// let minimise-to-tray swallow that close.
+autoUpdater.on("before-quit-for-update", () => {
   shouldQuit = true;
 });

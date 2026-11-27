@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld("native", {
   maximise: () => ipcRenderer.send("maximise"),
   close: () => ipcRenderer.send("close"),
 
+  // offline page ("Tentar novamente")
+  retryConnection: () => ipcRenderer.send("retryConnection"),
+
   setBadgeCount: (count: number) => ipcRenderer.send("setBadgeCount", count),
 
   onceScreenPicker: (

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Stoat Homelab
+Comment=Stoat client for our self-hosted homelab server
+Exec=env ELECTRON_OZONE_PLATFORM_HINT=auto stoat-homelab %U
+Icon=stoat-homelab
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;Chat;
+StartupWMClass=Stoat Homelab
+MimeType=x-scheme-handler/stoat;

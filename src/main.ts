@@ -1,10 +1,9 @@
 import { readFileSync, readdirSync } from "fs";
-import { join } from "path";
 import fs from "node:fs";
 import path from "node:path";
-import { IUpdateInfo, updateElectronApp } from "update-electron-app";
+import { join } from "path";
 
-import { BrowserWindow, Notification, app, shell } from "electron";
+import { BrowserWindow, app, shell } from "electron";
 import started from "electron-squirrel-startup";
 
 import { initAutoLaunch } from "./native/autoLaunch";
@@ -17,6 +16,7 @@ import {
 } from "./native/deepLink";
 import { initDiscordRpc } from "./native/discordRpc";
 import { initTray } from "./native/tray";
+import { initUpdater } from "./native/updater";
 import { destroyVirtualMic, initVirtualMic } from "./native/virtualMic";
 import { BUILD_URL, createMainWindow, mainWindow } from "./native/window";
 
@@ -153,21 +153,7 @@ if (config.hardwareAcceleration) {
 // ensure only one copy of the application can run
 const acquiredLock = app.requestSingleInstanceLock();
 
-const onNotifyUser = (_info: IUpdateInfo) => {
-  const notification = new Notification({
-    title: "Update Available",
-    body: "Restart the app to install the update.",
-    silent: true,
-  });
-
-  notification.show();
-};
-
 if (acquiredLock) {
-  // start auto update logic
-  // Only use the official updater when targeting the official Stoat host.
-  if (BUILD_URL.hostname === "stoat.chat") updateElectronApp({ onNotifyUser });
-
   // facilitate stoat:// links
   registerProtocol();
 
@@ -200,6 +186,9 @@ if (acquiredLock) {
     initDiscordRpc();
     initVirtualMic();
     initAutoLaunch();
+
+    // watch the fork's GitHub releases and offer one-click updates
+    initUpdater();
 
     // follow the link the app was started with; after the tray exists, as
     // showing the window updates the tray menu

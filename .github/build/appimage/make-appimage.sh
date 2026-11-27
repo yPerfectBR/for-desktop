@@ -11,6 +11,7 @@ export DEPLOY_PIPEWIRE=1
 
 cp -v ./assets/desktop/icon.svg ./AppDir/.DirIcon
 cp -v ./assets/desktop/icon.svg ./AppDir/
+cp -v ./assets/desktop/icon.svg ./AppDir/io.github.yperfectbr.StoatHomelab.svg
 cp -v ./io.github.yperfectbr.StoatHomelab.desktop ./AppDir/
 
 # Deploy dependencies

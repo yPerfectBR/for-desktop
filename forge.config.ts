@@ -1,5 +1,7 @@
+import { MakerDeb } from "@electron-forge/maker-deb";
 import { MakerFlatpak } from "@electron-forge/maker-flatpak";
 import { MakerFlatpakOptionsConfig } from "@electron-forge/maker-flatpak/dist/Config";
+import { MakerRpm } from "@electron-forge/maker-rpm";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
@@ -17,9 +19,24 @@ const STRINGS = {
   name: "StoatHomelab",
   execName: "stoat-homelab",
   description: "Open source user-first chat platform.",
+  homepage: "https://github.com/yPerfectBR/for-desktop",
 };
 
 const ASSET_DIR = "assets/desktop";
+
+// Shared by the .deb and .rpm packages
+const LINUX_PACKAGE_OPTIONS = {
+  name: STRINGS.execName,
+  productName: "Stoat Homelab",
+  genericName: "Chat",
+  description: STRINGS.description,
+  productDescription: "Stoat client for our self-hosted homelab server.",
+  bin: STRINGS.execName,
+  icon: `${ASSET_DIR}/hicolor/512x512.png`,
+  categories: ["Network" as const],
+  mimeType: ["x-scheme-handler/stoat"],
+  homepage: STRINGS.homepage,
+};
 
 /**
  * Build targets for the desktop app
@@ -38,6 +55,20 @@ const makers: ForgeConfig["makers"] = [
     copyright: "Copyright (C) 2025 Revolt Platforms LTD",
   }),
   new MakerZIP({}),
+  new MakerDeb({
+    options: {
+      ...LINUX_PACKAGE_OPTIONS,
+      section: "net",
+      maintainer: "yPerfectBR",
+      depends: ["libpipewire-0.3-0 | libpipewire-0.3-0t64"],
+    },
+  }),
+  new MakerRpm({
+    options: {
+      ...LINUX_PACKAGE_OPTIONS,
+      license: "AGPL-3.0",
+    },
+  }),
   new MakerFlatpak({
     options: {
       id: "io.github.yperfectbr.StoatHomelab",
@@ -45,6 +76,8 @@ const makers: ForgeConfig["makers"] = [
       productName: STRINGS.name,
       productDescription: STRINGS.description,
       runtimeVersion: "25.08",
+      base: "org.electronjs.Electron2.BaseApp",
+      baseVersion: "25.08",
       icon: {
         "16x16": `${ASSET_DIR}/hicolor/16x16.png`,
         "32x32": `${ASSET_DIR}/hicolor/32x32.png`,
@@ -91,6 +124,8 @@ const makers: ForgeConfig["makers"] = [
         "--talk-name=com.canonical.AppMenu.Registrar",
         "--talk-name=com.canonical.indicator.application",
         "--talk-name=com.canonical.Unity",
+        // self-updater: `flatpak-spawn --host flatpak install --bundle ...`
+        "--talk-name=org.freedesktop.Flatpak",
         "--env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons",
         "--env=ELECTRON_TRASH=gio",
         "--env=ELECTRON_OZONE_PLATFORM_HINT=auto",
